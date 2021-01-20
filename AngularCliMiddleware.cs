@@ -21,16 +21,14 @@ namespace Geexbox.FrontendClient
         private const string LogCategoryName = "Microsoft.AspNetCore.SpaServices";
         private static TimeSpan RegexMatchTimeout = TimeSpan.FromSeconds(5.0);
 
-        public static void Attach(ISpaBuilder spaBuilder, string npmScriptName)
+        public static void Attach(ISpaBuilder spaBuilder)
         {
             string sourcePath = spaBuilder.Options.SourcePath;
             if (string.IsNullOrEmpty(sourcePath))
                 throw new ArgumentException("Cannot be null or empty", "sourcePath");
-            if (string.IsNullOrEmpty(npmScriptName))
-                throw new ArgumentException("Cannot be null or empty", nameof(npmScriptName));
             ILogger logger =
                 spaBuilder.ApplicationBuilder.ApplicationServices.GetService<ILogger<AngularCliServerInfo>>();
-            Task<Uri> targetUriTask = AngularCliMiddleware.StartAngularCliServerAsync(sourcePath, npmScriptName, logger).ContinueWith<Uri>((Func<Task<AngularCliMiddleware.AngularCliServerInfo>, Uri>)(task => new UriBuilder("http", "localhost", task.Result.Port).Uri));
+            Task<Uri> targetUriTask = AngularCliMiddleware.StartAngularCliServerAsync(sourcePath, logger).ContinueWith<Uri>((Func<Task<AngularCliMiddleware.AngularCliServerInfo>, Uri>)(task => new UriBuilder("http", "localhost", task.Result.Port).Uri));
             spaBuilder.UseProxyToSpaDevelopmentServer((Func<Task<Uri>>)(() =>
             {
                 TimeSpan startupTimeout = spaBuilder.Options.StartupTimeout;
@@ -40,11 +38,10 @@ namespace Geexbox.FrontendClient
 
         private static async Task<AngularCliMiddleware.AngularCliServerInfo> StartAngularCliServerAsync(
           string sourcePath,
-          string npmScriptName,
           ILogger logger)
         {
             logger.LogInformation("Starting @angular/cli ...");
-            NpmScriptRunner npmScriptRunner = new NpmScriptRunner(sourcePath, npmScriptName, (IDictionary<string, string>)null);
+            NpmScriptRunner npmScriptRunner = new NpmScriptRunner(sourcePath, "start", (IDictionary<string, string>)null);
             npmScriptRunner.AttachToLogger(logger);
             Match match;
             using (EventedStreamStringReader stdErrReader = new EventedStreamStringReader(npmScriptRunner.StdErr))
@@ -55,7 +52,7 @@ namespace Geexbox.FrontendClient
                 }
                 catch (EndOfStreamException ex)
                 {
-                    throw new InvalidOperationException("The NPM script '" + npmScriptName + "' exited without indicating that the Angular CLI was listening for requests. The error output was: " + stdErrReader.ReadAsString(), (Exception)ex);
+                    throw new InvalidOperationException("The NPM script 'start' exited without indicating that the Angular CLI was listening for requests. The error output was: " + stdErrReader.ReadAsString(), (Exception)ex);
                 }
             }
             Uri cliServerUri = new Uri(match.Groups[1].Value);
